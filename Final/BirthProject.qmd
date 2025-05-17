@@ -1,0 +1,620 @@
+---
+title: "Final Project"
+subtitle: "Birth data: births and infant deaths in the U.S. 2010-present across some demographic subgroups"
+author: "Hon Chi Chan"
+format: 
+  pdf
+html-math-method: mathjax
+execute:
+  echo: false
+editor: 
+  markdown: 
+    wrap: 72
+---
+
+```{r setup, include = FALSE}
+knitr::opts_chunk$set(message =  FALSE)
+
+knitr::opts_chunk$set(warning =  FALSE)
+knitr::opts_chunk$set(error =  FALSE)
+knitr::opts_chunk$set(echo =  FALSE)
+bfcolor <- function(x, color) {
+  if (knitr::is_latex_output()) {
+    sprintf("\\textcolor{%s}{\\textbf{%s}}", color, x)
+  } else if (knitr::is_html_output()) {
+    sprintf("<span style='color: %s;'><b>%s</b></span>", color, x)
+  } else x
+}
+
+# Install necessary libraries if they aren't installed
+if (!require(dplyr)) install.packages("dplyr")
+if (!require(tidyr)) install.packages("tidyr")
+if (!require(ggplot2)) install.packages("ggplot2")
+```
+
+# **1. Introduction**
+
+This report concerns births and infant mortality in the United States.
+Our analysis focuses on understanding the factors influencing birth
+rates using a linear regression model with three predictors: the
+proportion of mothers without a high school diploma, the proportion of
+Medicaid-covered births, and the proportion of mothers with college
+education. In this analysis, I aim to thoroughly investigate the
+relationship between fertility rates and educational attainment using
+linear regression models. Given the academic nature of this work, it is
+essential to present a detailed methodology to ensure a comprehensive
+understanding of the analytical approach. This not only supports
+educational objectives but also provides a foundation for replicability
+and deeper insights into the analytical process
+
+# **Research Question:**
+
+**How do educational attainment and Medicaid coverage among mothers
+influence the infant birth rates across different states and time
+periods?**
+
+The first few rows of the test data are shown below: Births and
+population by state 2016-2023: The columns are:
+
+| Column name | Meaning |
+|------------------------------------|------------------------------------|
+| `state` | 51 states and DC |
+| `year` | Calendar year of the data |
+| `bmcode` | Bimonthly code. Data is aggregated into 2 month chunks. 1 means January 1 through end of Feb. 6 corresponds to data from November-December. |
+| `births_nohs` | Births to mothers without high school education |
+| `births_coll` | Births to mothers with college degree |
+| `births_medicaid` | Births covered by Medicaid |
+| `births_total` | Total births across all categories |
+| `pop_total` | Total population in the area |
+| `pop_nohs` | Population without high school education (women age 15-54 population) |
+| `pop_medicaid` | Population covered by Medicaid (women age 15-54 population) |
+| `pop_coll` | Population with college degree (women age 15-54 population) |
+
+```{r}
+library(dplyr)
+birth_file <- read.csv("~/Desktop/UCSBCourses/PSTAT100/Final/fertility_infant_mortality/fertility_data.csv")
+
+nohs_sub <- birth_file |> select(state,year, births_nohs)
+hs_sub <- birth_file |> select(state, year, births_hs)
+somecoll_sub <- birth_file |> select(state, year, births_somecoll)
+coll_sub <- birth_file |> select(state, year, births_coll)
+
+medicaid <- birth_file |> select(state, year, births_medicaid)
+nonmedicaid <- birth_file |> select(state, year, births_nonmedicaid)
+
+b_total <- birth_file |> select(state, year, births_total)
+
+pop_total <- birth_file |> select(state, year, pop_total)
+pop_nohs <- birth_file |> select(state, year, pop_nohs)
+pop_medicaid <- birth_file |> select(state, year, pop_medicaid)
+pop_coll <- birth_file |> select(state, year, pop_coll)
+
+birth_data <- birth_file |>
+  mutate(
+    birth_rate = births_total / pop_total,
+    prop_nohs = births_nohs / pop_nohs,
+    prop_medicaid = births_medicaid / pop_medicaid,
+    prop_coll = births_coll / pop_coll
+  )
+
+birth_data_clean <- na.omit(birth_data)
+birth_data_clean <- birth_data |> select(state, year, birth_rate, prop_nohs, prop_medicaid, prop_coll)
+birth_data_clean <- birth_data_clean %>%
+  mutate(prop_nohs = prop_nohs * 100, 
+         prop_medicaid = prop_medicaid * 100,
+         prop_coll = prop_coll * 100)
+
+```
+
+# **2. Simple Linear Regression Explanation**
+
+This section provides a theoretical foundation for the analysis,
+explaining the matrix formulation of the linear regression model. It's
+beneficial if your audience needs clarity on the mathematical
+underpinnings of the model.
+
+To start, I'll fit a simple linear model regressing birth rates on
+educational attainment and Medicaid coverage. First, I need to organize
+our data into the necessary components—the response and explanatory
+variables—required for fitting the model in the correct format. Recall
+that the linear regression model, in matrix form, is represented as:
+
+$$
+\mathbf{y} = \mathbf{X} \boldsymbol{\beta} + \boldsymbol{\epsilon}
+$$
+
+where:
+
+$$
+\mathbf{y} =
+\begin{bmatrix}
+y_1 \\
+y_2 \\
+\vdots \\
+y_n
+\end{bmatrix}
+\quad , \quad
+$$
+
+-   Represents the birth rates for different observations(states and
+    time periods).
+
+$$
+\mathbf{X} =
+\begin{bmatrix}
+1 & x_{11} & x_{12} & x_{13} \\
+1 & x_{21} & x_{22} & x_{23} \\
+\vdots & \vdots & \vdots & \vdots \\
+1 & x_{n1} & x_{n2} & x_{n3}
+\end{bmatrix}
+$$
+
+-   Contains a column of ones for the intercept and columns
+    representing:
+
+$x_{ij1}$: Proportion of mothers without a high school diploma.
+
+$x_{ij2}$: Proportion of Medicaid-covered births.
+
+$x_{ij3}$: Proportion of mothers with a college education.
+
+This is the model coefficients:
+
+$$
+\boldsymbol{\beta} =
+\begin{bmatrix}
+\beta_0 \\
+\beta_1 \\
+\beta_2 \\
+\beta_3
+\end{bmatrix}
+$$
+
+This is the captures the error terms:
+
+$$
+\boldsymbol{\epsilon} =
+\begin{bmatrix}
+\epsilon_1 \\
+\epsilon_2 \\
+\vdots \\
+\epsilon_n
+\end{bmatrix}
+$$
+
+This setup allows us to systematically evaluate the influence of
+education and Medicaid coverage on birth rates. The matrix includes a
+column of ones for the intercept, which is crucial for estimating the
+model coefficients.
+
+# **3. Preparing the Design Matrix for Linear Regression Analysis**
+
+```{r}
+y <- birth_data_clean$birth_rate
+x <- model.matrix(~ prop_nohs + prop_medicaid + prop_coll, data = birth_data_clean)
+```
+
+This is a part of preparing data for a linear regression analysis. It
+involves creating a design matrix that includes both the response
+variable and explanatory variables.
+
+Organizing Data: This setup organizes the data into a format suitable
+for fitting a linear regression model, where y is the dependent variable
+and x contains the independent variables.
+
+Modeling Framework: By using the design matrix, the regression model can
+systematically estimate the relationships between birth rates and the
+explanatory factors of educational attainment and Medicaid coverage.
+
+# **4. Estimation**
+
+In this section, I apply the linear regression model to our data,
+focusing on extracting key statistical parameters such as coefficients,
+variance estimates, and interpreting the results. This process involves
+fitting the model to our dataset and using statistical software to
+derive meaningful insights.
+
+```{r}
+model <- lm(birth_rate ~ prop_nohs + prop_medicaid + prop_coll, data = birth_data_clean)
+summary(model)
+```
+
+The regression analysis indicated that all predictors have a significant
+impact on birth rates, with (p)-values less than (2.2e-16). The
+coefficients suggest that increases in the proportion of mothers without
+a high school diploma, Medicaid-covered births, and college education
+are associated with increased birth rates.
+
+# **5. Extracting Estimates**
+
+The coefficient estimates $\widehat{\beta}_0$ and $\widehat{\beta}_1$
+are obtained using:
+
+```{r}
+cat("The cefficient estimates : ", "\n" )
+coef(model)
+```
+
+-   Intercept: This is the estimated value of the birth rate when all
+    the explanatory variables are zero. A positive value suggests a
+    slight increase in birth rates as this proportion increases.
+
+-   prop_nohs: This coefficient indicates the estimated change in birth
+    rates for a one-unit increase in the proportion of Medicaid-covered
+    births, with all other factors held constant. A positive value means
+    a slight increase in birth rates as this proportion increases.
+
+-   prop_medicaid: This coefficient indicates the estimated change in
+    birth rates for a one-unit increase in the proportion of
+    Medicaid-covered births, with all other factors held constant. A
+    positive value implies a slight increase in birth rates as Medicaid
+    coverage increases.
+
+-   prop_coll: This coefficient says that the estimated change in birth
+    rates for a one-unit increase in the proportion of mothers with a
+    college education, holding other variables constant. The positive
+    value means a more significant increase in birth rates associated
+    with higher educational attainment.
+
+# **6. Error Variance Estimate**
+
+The error variance estimate $\widehat{\sigma}^2$ can be retrieved as:
+
+```{r}
+cat("Error Variance Estimate : ", "\n" )
+sigma_hat2 <- summary(model)$sigma^2
+sigma_hat2
+```
+
+This statistic measures the variance of the residuals, indicating how
+much the observed birth rates deviate from those predicted by the model.
+A smaller value suggests that the model's predictions closely fit the
+actual data, while a larger value would indicate more variability.
+
+# **7. Variance-Covariance Matrix**
+
+The variance-covariance matrix of the estimated coefficients is given by
+$\sigma^2 (\mathbf{X}'\mathbf{X})^{-1}$ which can be retrieved in R
+using:
+
+```{r}
+vcov(model)
+```
+
+# **8. Model Interpretation R-Squared:**
+
+A standard metric often reported with linear models is the $R^2$ score,
+which quantifies the proportion of variation in the response explained
+by the model:
+
+```{r}
+cat("R-Squared : ", "\n" )
+summary(model)$r.squared
+```
+
+# **9. Fitted values and Residuals**
+
+The fitted value for $y_i$ is the value along the line specified by the
+model that corresponds to the matching explanatory variable $x_i$. In
+other words:
+$$ \hat{y}_i = \hat{\beta}_0 + \hat{\beta}_1 x_{i1} + \hat{\beta}_2 x_{i2} + \ldots + \hat{\beta}_p x_{ip} $$
+
+This formula includes the intercept $\hat{\beta}_0$ and the
+contributions from each predictor variable $x_{ij}$.
+
+Residuals, denoted as $e_i$, are the differences between the observed
+values of the response variable and their corresponding fitted values.
+Residuals indicate how much the model's predictions deviate from the
+actual data.
+
+The residual for the i-th observation is calculated as:
+$e_i = y_i - \hat{y}_i$ Here, ${y}_i$ is the actual observed value, and
+$\hat{y}_i$ is the predicted value by the model.
+
+```{r}
+fit_values <- fitted(model)
+residuals <- residuals(model)
+X <- cbind(1, birth_data_clean$prop_nohs, birth_data_clean$prop_medicaid, birth_data_clean$prop_coll)
+y <- birth_data_clean$birth_rate
+fitted_manual <- X %*% coef(model)
+resid_manual <- y - fitted_manual
+
+birth_data_clean$fitted_values <- fitted_manual
+birth_data_clean$residuals <- resid_manual
+```
+
+Fitted Values: These provide an estimate of the response variable based
+on the model. They are crucial for understanding the model's predictions
+and can be used to assess the overall fit of the model.
+
+Residuals: They measure the accuracy of predictions. Small residuals
+indicate that the model's predictions are close to the actual values,
+suggesting a good fit. Analyzing residuals helps in diagnosing model
+performance and checking assumptions, such as homoscedasticity and
+normality.
+
+# **10. Visualizing the Model**
+
+```{r}
+
+library(gridExtra)
+
+plot3 <- ggplot(birth_data_clean, aes(x = prop_nohs, y = birth_rate)) + 
+  geom_point() + 
+  geom_smooth(method = "lm", col = "blue", se = TRUE) +
+  labs(title = "Birth Rate vs. Proportion of Mothers without HS Diploma",
+       x = "Proportion of Mothers without High School Diploma", 
+       y = "Birth Rate (Births per 1,000 Women)") +
+  theme(plot.title = element_text(size = 8),
+        axis.title.x = element_text(size = 8),
+        axis.title.y = element_text(size = 8))
+
+plot4 <- ggplot(birth_data_clean, aes(x = prop_medicaid, y = birth_rate)) + 
+  geom_point() + 
+  geom_smooth(method = "lm", col = "blue", se = TRUE) +
+  labs(title = "Birth Rate vs. Proportion of Medicaid Covered Births", 
+       x = "Proportion of Mothers without High School Diploma", 
+       y = "Birth Rate (Births per 1,000 Women)") +
+  theme(plot.title = element_text(size = 8),
+        axis.title.x = element_text(size = 8),
+        axis.title.y = element_text(size = 8))
+
+grid.arrange(plot3, plot4, ncol = 2, widths = c(1,1))
+```
+
+Scatter Plot Analysis Description The scatter plots visually represent
+the relationship between birth rates and two key variables: the
+proportion of births covered by Medicaid and the proportion of mothers
+without a high school diploma. Each point in the scatter plots
+corresponds to an observation in the dataset, such as a state or region.
+
+Observed Relationships:
+
+Birth Rate vs. Proportion of Medicaid Covered Births:
+
+Positive Trend: The scatter plot indicates a positive correlation
+between the proportion of Medicaid-covered births and the birth rate. As
+the proportion of Medicaid-covered births increases, the birth rate also
+tends to increase.
+
+Trend Line: The blue trend line in the plot confirms this positive
+relationship, suggesting that higher proportions of Medicaid-covered
+births are associated with higher birth rates.
+
+Density and Variability: There is a dense clustering of points around
+the trend line, although the points are spread out horizontally. This
+indicates a consistent pattern with some variability across the data.
+
+Birth Rate vs. Proportion of Mothers without High School Diploma:
+
+Positive Trend: Similar to the Medicaid plot, there is a positive
+correlation between the proportion of mothers without a high school
+diploma and birth rates. As the proportion increases, the birth rate
+tends to rise. Trend Line: The blue trend line illustrates this
+relationship, indicating that a higher proportion of mothers without a
+high school diploma is associated with higher birth rates.
+
+Density and Spread: There is a noticeable clustering of points around
+the trend line, suggesting a strong pattern across the data. However,
+the variability is more pronounced, as indicated by the wider spread of
+points.
+
+The calculated coverage probability (approximately 94.77%) implies that
+the prediction intervals provided by the model are effectively capturing
+the true variability of the birth rates across observations. This high
+coverage rate indicates that the intervals are appropriately wide,
+considering both model uncertainty and inherent data variability,
+thereby providing reliable predictions for new observations.
+
+# **11. Multiple Linear Regression**
+
+```{r}
+plot5<- ggplot(birth_data, aes(x = prop_nohs, y = birth_rate)) +
+  geom_point() +  # Scatter plot
+  geom_smooth(method = "lm", col = "blue") +  
+  labs(title = "Birth Rate vs. Mothers without High School Diploma",
+       x = "Proportion without High School Diploma",
+       y = "Birth Rate") + 
+  theme(plot.title = element_text(size = 8),
+  axis.title.x = element_text(size = 8),
+  axis.title.y = element_text(size = 8))
+
+plot6 <- ggplot(birth_data, aes(x = prop_medicaid, y = birth_rate)) +
+  geom_point() +
+  geom_smooth(method = "lm", col = "red") +
+  labs(title = "Birth Rate vs. Medicaid-covered Births",
+       x = "Proportion of Medicaid-covered Births",
+       y = "Birth Rate") + 
+  theme(plot.title = element_text(size = 8),
+  axis.title.x = element_text(size = 8),
+  axis.title.y = element_text(size = 8))
+
+plot7 <- ggplot(birth_data, aes(x = prop_coll, y = birth_rate)) +
+  geom_point() +
+  geom_smooth(method = "lm", col = "green") +
+  labs(title = "Birth Rate vs. Mothers with College Education",
+       x = "Proportion with College Education",
+       y = "Birth Rate") + 
+  theme(plot.title = element_text(size = 8),
+  axis.title.x = element_text(size = 8),
+  axis.title.y = element_text(size = 8))
+
+grid.arrange(plot5, plot6, plot7, ncol = 2, widths = c(1,1))
+```
+
+# **12. Correlation Analysis of Birth Rates with Socio-Economic Factors**
+
+```{r}
+cor_nohs <- cor(birth_data_clean$birth_rate, birth_data_clean$prop_nohs, use = "complete.obs")
+cor_medicaid <- cor(birth_data_clean$birth_rate, birth_data_clean$prop_medicaid, use = "complete.obs")
+cor_coll <- cor(birth_data_clean$birth_rate, birth_data_clean$prop_coll, use = "complete.obs")
+
+cat("Correlation with prop_nohs:", cor_nohs, "\n")
+cat("Correlation with prop_medicaid:", cor_medicaid, "\n")
+cat("Correlation with prop_coll:", cor_coll, "\n")
+```
+
+The correlation analysis reveals the strength and direction of the
+linear relationship between birth rates and the studied socio-economic
+factors:
+
+Proportion Without High School Diploma (prop_nohs): The correlation
+coefficient of 0.4269 indicates a moderate positive relationship. This
+suggests that as the proportion of mothers without a high school diploma
+increases, the birth rate tends to increase moderately.
+
+Proportion of Medicaid-Covered Births (prop_medicaid): With a
+correlation coefficient of 0.2849, there is a weak positive relationship
+between Medicaid coverage and birth rates. This suggests a slight
+tendency for birth rates to increase with higher Medicaid coverage,
+though the relationship is not strong.
+
+Proportion with College Education (prop_coll): The high correlation
+coefficient of 0.8001 indicates a strong positive relationship. This
+suggests that higher proportions of mothers with a college education are
+strongly associated with higher birth rates.
+
+These correlations provide insights into how different educational and
+health coverage factors relate to birth rates, highlighting the varying
+degrees of influence each factor has. The strong correlation with
+college education, in particular, points to significant socio-economic
+implications.
+
+# **13. Linear Regression Analysis of Birth Rate with Proportion Without High School Diploma**
+
+```{r}
+print("Birth Rate Based on Proportion Without a High School Diploma")
+mlr_nohs <- lm(birth_rate ~ prop_nohs, data = birth_data_clean)
+coefficients <- coef(mlr_nohs)
+standard_errors <- sqrt(diag(vcov(mlr_nohs)))
+sigma_hat2_mlr <- summary(mlr_nohs)$sigma^2
+cat("Coefficients:\n", coefficients, "\n")
+cat("Standard Errors:\n", standard_errors, "\n")
+cat("Variance of Residuals:\n", sigma_hat2_mlr, "\n", "\n")
+
+print("Birth Rate Based on Proportion of Medicaid-Covered")
+mlr_medi <- lm(birth_rate ~ prop_medicaid, data = birth_data_clean)
+coefficients <- coef(mlr_medi)
+standard_errors <- sqrt(diag(vcov(mlr_medi)))
+sigma_hat2_mlr <- summary(mlr_medi)$sigma^2
+cat("Coefficients:\n", coefficients, "\n")
+cat("Standard Errors:\n", standard_errors, "\n")
+cat("Variance of Residuals:\n", sigma_hat2_mlr, "\n", "\n")
+
+print("The Influence of Mothers with College Education on Birth Rates")
+mlr_coll <- lm(birth_rate ~ prop_coll, data = birth_data_clean)
+coefficients <- coef(mlr_coll)
+standard_errors <- sqrt(diag(vcov(mlr_coll)))
+sigma_hat2_mlr <- summary(mlr_coll)$sigma^2
+cat("Coefficients:\n", coefficients, "\n")
+cat("Standard Errors:\n", standard_errors, "\n")
+cat("Variance of Residuals:\n", sigma_hat2_mlr, "\n")
+```
+
+1.  Birth Rate Based on Proportion Without a High School Diploma The
+    analysis reveals a coefficient of 0.002296 for the proportion of
+    mothers without a high school diploma, indicating a positive
+    relationship between this factor and birth rates. The standard error
+    is relatively small at 9.835601e-05, suggesting precise estimates.
+    The variance of residuals is 1.040358e-06, pointing to a reasonable
+    fit of the model.
+
+2.  Birth Rate Based on Proportion of Medicaid-Covered A coefficient of
+    0.001442 for Medicaid coverage suggests a positive yet weaker
+    relationship with birth rates compared to educational factors. The
+    standard error is 9.809447e-05, indicating reliable estimates, while
+    the variance of residuals is 1.168888e-06, showing a fair model fit.
+
+3.  The Influence of Mothers with College Education on Birth Rates The
+    coefficient of 0.005423 for mothers with college education is
+    notably higher, reflecting a strong positive association with birth
+    rates. The standard error is 8.222078e-05, denoting precise
+    estimates. The variance of residuals, at 4.577792e-07, suggests a
+    good model fit, highlighting the significant impact of higher
+    education levels on birth rates.
+
+Conclusion: Overall, these analyses demonstrate varying degrees of
+influence that educational attainment and Medicaid coverage have on
+birth rates. The positive association with college education is
+particularly strong, suggesting that higher education levels may lead to
+higher birth rates, perhaps due to increased socio-economic stability.
+
+# **14. Model Fit and** $R^2$ Statistic
+
+The following R2 values represent the proportion of variance in birth
+rates explained by each model, highlighting the influence of educational
+attainment and Medicaid coverage among mothers:
+
+```{r}
+cat("Model 1: Impact of Low Educational Attainment on Birth Rates: ", summary(mlr_nohs)$r.squared, "\n")
+
+cat("Model 2: Influence of Medicaid Coverage on Birth Rates : ", summary(mlr_medi)$r.squared, "\n")
+
+cat("Model 3: Effect of Higher Education on Birth Rates : ", summary(mlr_coll)$r.squared, "\n")
+
+```
+
+Model 1: Impact of Low Educational Attainment on Birth Rates
+
+($R^2$)=0.1822: This indicates that approximately 18.2% of the variance
+in birth rates is explained by the proportion of mothers without a high
+school diploma. This suggests a moderate impact of low educational
+attainment on birth rates.
+
+Model 2: Influence of Medicaid Coverage on Birth Rates
+
+($R^2$)=0.0812: About 8.1% of the variance in birth rates is explained
+by Medicaid coverage. This relatively low ($R^2$) suggests a weaker
+influence of Medicaid coverage on birth rates compared to educational
+factors.
+
+Model 3: Effect of Higher Education on Birth Rates
+
+($R^2$)=0.6402: This model explains 64.0% of the variance in birth
+rates, indicating a strong positive relationship between higher
+education levels among mothers and birth rates.
+
+The multiple linear regression model, by considering all these factors,
+captures more variance than any individual model, providing a
+comprehensive understanding of how these socio-economic factors jointly
+influence birth rates.
+
+# **15. Discussion**
+
+In this project, I studied how educational attainment and Medicaid
+coverage among mothers influence birth rates across different states in
+the U.S. The main goal was to understand if these socioeconomic factors
+have significant impacts on birth rates and how strong these impacts
+might be.
+
+The strongest finding was that mothers with a college education had a
+clear positive relationship with birth rates (r=0.8001). This factor
+alone explained about 64% of the differences in birth rates. This
+suggests that mothers with college education tend to have higher birth
+rates, possibly due to better economic stability and resources.
+
+Mothers without a high school diploma also showed a positive but weaker
+relationship with birth rates (r=0.4269), explaining about 18.2% of the
+variation. Medicaid coverage had the weakest relationship of the three
+factors (r=0.2849), explaining only about 8.1%.
+
+When considering all three factors together in a multiple regression
+model, I explained around 82.2% of the variation in birth rates, showing
+that these factors together significantly influence birth rates.
+
+The study has some limitations. The data used was aggregated at the
+state level, which may hide important variations within states, such as
+differences between urban and rural areas or between different
+socioeconomic groups. Another limitation is the absence of other
+potentially influential factors such as income levels, race or
+ethnicity, healthcare accessibility, or policy differences.
+
+Future research could use more detailed data, like county or city-level
+statistics, and include additional factors. This would allow for a more
+complete understanding of what drives birth rates, enabling
+better-informed policy decisions and interventions.
+
+Overall, educational attainment, especially college education, has a
+significant positive impact on birth rates. Medicaid coverage and lower
+educational attainment also influence birth rates but to a lesser
+extent.
