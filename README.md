@@ -1,4 +1,4 @@
-## 👶 Project 1: Birth Rate and Educational Attainment Analysis
+## 👶 Project: Birth Rate and Educational Attainment Analysis
 
 **Goal:**  
 To investigate how maternal education levels and Medicaid coverage influence U.S. birth rates across states from 2010 to 2023.
