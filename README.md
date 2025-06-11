@@ -22,7 +22,7 @@ To investigate how maternal education levels and Medicaid coverage influence U.S
 
 **Hon Chi (Andy) Chan**  
 B.A. in Statistics & Data Science – UCSB  
-📍 Based in California | 🇭🇰 Originally from Hong Kong  
+📍 Based in California 
 🔗 www.linkedin.com/in/andy59 
 📧 hchan707@ucsb.edu
 
