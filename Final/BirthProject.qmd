@@ -1,5 +1,5 @@
 ---
-title: "Final Project"
+title: "Project"
 subtitle: "Birth data: births and infant deaths in the U.S. 2010-present across some demographic subgroups"
 author: "Hon Chi Chan"
 format: 
@@ -190,7 +190,7 @@ model coefficients.
 # **3. Preparing the Design Matrix for Linear Regression Analysis**
 
 ```{r}
-y <- birth_data_clean$birth_rate
+y <- birth_data_clean$birth_rate 
 x <- model.matrix(~ prop_nohs + prop_medicaid + prop_coll, data = birth_data_clean)
 ```
 
