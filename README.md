@@ -14,7 +14,7 @@ To investigate how maternal education levels and Medicaid coverage influence U.S
 - Births among mothers without high school education and those on Medicaid also showed positive associations but with weaker explanatory power.
 - The project demonstrates how social and educational factors jointly explain over 80% of variation in state-level birth rates.
 
-📄 [Read the full report](./BirthProject.pdf)
+📄 [Read the full report]([./BirthProject.pdf](https://github.com/hchan707/Data-Science-Concepts-and-Analysis/blob/main/Final/BirthProject.pdf))
 
 ---
 
